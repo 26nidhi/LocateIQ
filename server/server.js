@@ -5,6 +5,9 @@ import cors from "cors";
 import http from "http";
 import { Server as IOServer } from "socket.io";
 import connectDB from "./config/db.js";
+import authRoutes from "./routes/authRoutes.js";
+
+
 
 // routes (placeholders — create these files later)
 import authRoutes from "./routes/authRoutes.js";
