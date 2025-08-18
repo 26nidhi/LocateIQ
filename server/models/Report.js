@@ -12,7 +12,14 @@ const reportSchema = new mongoose.Schema(
     },
     group: { type: mongoose.Schema.Types.ObjectId, ref: "Group" },
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    status: {
+      type: String,
+      enum: ["open", "returned", "resolved"],
+      default: "open",
+    },
+    resolvedAt: { type: Date },
   },
+
   { timestamps: true }
 );
 
