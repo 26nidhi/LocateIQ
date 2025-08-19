@@ -1,39 +1,40 @@
-// controllers/reportController.js
 import Report from "../models/Report.js";
+import matchReports from "../utils/matchAlgorithm.js";
 
-// Create a new lost/found report
+// Create new lost/found report
 export const createReport = async (req, res) => {
   try {
     const { type, title, description, latitude, longitude, imageUrl } =
       req.body;
 
-    if (!req.user?.group) {
+    if (!req.user.group) {
       return res.status(400).json({ message: "You must join a group first" });
     }
 
-    const report = await Report.create({
+    const report = new Report({
       type,
       title,
       description,
       imageUrl,
       location: {
         type: "Point",
-        coordinates: [Number(longitude), Number(latitude)],
+        coordinates: [longitude, latitude],
       },
       group: req.user.group,
-      user: req.user.id,
+      user: req.user._id,
     });
 
-    // TODO: plug in your match logic here if desired
-    // const matches = await matchReports(report);
+    await report.save();
+
+    // Run match algorithm for opposite type reports in same group
+    const matches = await matchReports(report);
 
     res.status(201).json({
       message: "Report created successfully",
       report,
-      // matches,
+      matches,
     });
   } catch (error) {
-    console.error("Error creating report:", error);
     res
       .status(500)
       .json({ message: "Error creating report", error: error.message });
@@ -43,17 +44,16 @@ export const createReport = async (req, res) => {
 // Get all reports in the user's group
 export const getReports = async (req, res) => {
   try {
-    if (!req.user?.group) {
+    if (!req.user.group) {
       return res.status(400).json({ message: "You must join a group first" });
     }
 
-    const reports = await Report.find({ group: req.user.group })
-      .populate("user", "name email")
-      .sort({ createdAt: -1 });
-
+    const reports = await Report.find({ group: req.user.group }).populate(
+      "user",
+      "name email"
+    );
     res.json(reports);
   } catch (error) {
-    console.error("Error fetching reports:", error);
     res
       .status(500)
       .json({ message: "Error fetching reports", error: error.message });
@@ -63,63 +63,43 @@ export const getReports = async (req, res) => {
 // Get single report by ID
 export const getReportById = async (req, res) => {
   try {
-    const report = await Report.findById(req.params.id)
-      .populate("user", "name email")
-      .populate("group", "name location radius");
-
-    if (!report) return res.status(404).json({ message: "Report not found" });
-
-    // Allow if same group or owner
-    const sameGroup =
-      req.user?.group?.toString() === report.group?.id?.toString();
-    const isOwner = report.user?.id?.toString() === req.user?.id;
-    if (!sameGroup && !isOwner) {
-      return res
-        .status(403)
-        .json({ message: "Not allowed to view this report" });
+    const report = await Report.findById(req.params.id).populate(
+      "user",
+      "name email"
+    );
+    if (!report) {
+      return res.status(404).json({ message: "Report not found" });
     }
-
     res.json(report);
   } catch (error) {
-    console.error("Error getting report:", error);
     res
       .status(500)
-      .json({ message: "Error getting report", error: error.message });
+      .json({ message: "Error fetching report", error: error.message });
   }
 };
 
-// Update report status (e.g., open → returned/resolved)
+// Update report status (e.g., Found, Returned)
 export const updateReportStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const ALLOWED = ["open", "returned", "resolved"];
-    if (!ALLOWED.includes(status)) {
-      return res
-        .status(400)
-        .json({ message: `Invalid status. Allowed: ${ALLOWED.join(", ")}` });
-    }
-
     const report = await Report.findById(req.params.id);
-    if (!report) return res.status(404).json({ message: "Report not found" });
 
-    // Only owner can update their report
-    if (report.user.toString() !== req.user.id) {
-      return res
-        .status(403)
-        .json({ message: "Not allowed to update this report" });
+    if (!report) {
+      return res.status(404).json({ message: "Report not found" });
     }
 
-    report.status = status;
-    report.resolvedAt =
-      status === "returned" || status === "resolved" ? new Date() : undefined;
+    if (report.user.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    report.status = status || report.status;
     await report.save();
 
-    res.json({ message: "Status updated", report });
+    res.json({ message: "Report status updated", report });
   } catch (error) {
-    console.error("Error updating status:", error);
     res
       .status(500)
-      .json({ message: "Error updating status", error: error.message });
+      .json({ message: "Error updating report", error: error.message });
   }
 };
 
@@ -127,19 +107,19 @@ export const updateReportStatus = async (req, res) => {
 export const deleteReport = async (req, res) => {
   try {
     const report = await Report.findById(req.params.id);
-    if (!report) return res.status(404).json({ message: "Report not found" });
 
-    // Only owner can delete their report
-    if (report.user.toString() !== req.user.id) {
-      return res
-        .status(403)
-        .json({ message: "Not allowed to delete this report" });
+    if (!report) {
+      return res.status(404).json({ message: "Report not found" });
+    }
+
+    if (report.user.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: "Not authorized" });
     }
 
     await report.deleteOne();
-    res.json({ message: "Report deleted" });
+
+    res.json({ message: "Report deleted successfully" });
   } catch (error) {
-    console.error("Error deleting report:", error);
     res
       .status(500)
       .json({ message: "Error deleting report", error: error.message });
