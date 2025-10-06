@@ -41,7 +41,6 @@ export default function SignInSignUp() {
     }
   };
 
-  // Sign Up
   const handleSignUp = async (e) => {
     e.preventDefault();
     setError("");
