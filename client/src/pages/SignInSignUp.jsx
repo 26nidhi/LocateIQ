@@ -73,7 +73,6 @@ export default function SignInSignUp() {
     }
   };
 
-  // OAuth Redirects
   const handleGoogle = () => {
     window.location.href = "/auth/google";
   };
