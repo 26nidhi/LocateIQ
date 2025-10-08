@@ -14,7 +14,6 @@ export default function SignInSignUp() {
   const [success, setSuccess] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // Sign In
   const handleSignIn = async (e) => {
     e.preventDefault();
     setError("");
@@ -34,7 +33,6 @@ export default function SignInSignUp() {
 
       if (!res.ok) throw new Error(data.message || "Failed to sign in");
       setSuccess("Signed in successfully!");
-      // redirect
       window.location.href = "/dashboard";
     } catch (err) {
       setError(err.message);
@@ -83,7 +81,6 @@ export default function SignInSignUp() {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-gradient-to-br from-emerald-50 to-teal-50">
-      {/* Left */}
       <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex-col justify-center items-center p-8">
         <MapPinIcon className="w-16 h-16 mb-4" />
         <h1 className="text-3xl lg:text-4xl font-bold">LocateIQ</h1>
@@ -92,10 +89,8 @@ export default function SignInSignUp() {
         </p>
       </div>
 
-      {/* Right */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8">
         <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6 sm:p-8">
-          {/* Tabs */}
           <div className="flex mb-6 rounded-xl overflow-hidden border border-slate-200">
             {["signin", "signup"].map((tab) => (
               <button
@@ -116,7 +111,6 @@ export default function SignInSignUp() {
             ))}
           </div>
 
-          {/* Alerts */}
           {(error || success) && (
             <div
               className={`mb-4 px-4 py-2 rounded-lg text-sm font-medium shadow-inner ${
@@ -129,10 +123,8 @@ export default function SignInSignUp() {
             </div>
           )}
 
-          {/* Forms */}
           {activeTab === "signin" ? (
             <form className="flex flex-col gap-5" onSubmit={handleSignIn}>
-              {/* Email */}
               <div className="relative">
                 <input
                   type="email"
@@ -149,7 +141,6 @@ export default function SignInSignUp() {
                 </label>
               </div>
 
-              {/* Password */}
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -184,7 +175,6 @@ export default function SignInSignUp() {
                 Sign In
               </button>
 
-              {/* Social */}
               <div className="flex items-center my-3">
                 <div className="flex-grow border-t border-slate-200"></div>
                 <span className="mx-2 text-slate-400 text-sm">or</span>
@@ -261,7 +251,6 @@ export default function SignInSignUp() {
                 Sign Up
               </button>
 
-              {/* Social */}
               <div className="flex items-center my-3">
                 <div className="flex-grow border-t border-slate-200"></div>
                 <span className="mx-2 text-slate-400 text-sm">or</span>
