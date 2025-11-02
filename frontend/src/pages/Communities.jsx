@@ -11,7 +11,7 @@ export default function Communities() {
 
   const fetchCommunities = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/api/communities", {
+      const res = await axios.get("http://localhost:5000/api/communities", {
         headers: { Authorization: `Bearer ${token}` },
       });
       setCommunities(res.data.communities);
@@ -28,7 +28,7 @@ export default function Communities() {
     e.preventDefault();
     try {
       await axios.post(
-        "http://localhost:3000/api/communities",
+        "http://localhost:5000/api/communities",
         { name, description },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -41,22 +41,22 @@ export default function Communities() {
   };
 
   const handleJoin = async (communityId) => {
+    console.log("Joining:", communityId); // <--- add this
     try {
       await axios.post(
-        `http://localhost:3000/api/communities/${communityId}/join`,
+        `http://localhost:5000/api/communities/${communityId}/join`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
       fetchCommunities();
     } catch (err) {
-      console.error(err);
+      console.error("Join failed:", err.response?.data || err.message);
     }
   };
 
   return (
     <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen text-gray-800 dark:text-gray-100">
       <h2 className="text-3xl font-bold mb-4">Communities</h2>
-
       <form onSubmit={handleCreate} className="mb-6 space-y-2">
         <input
           type="text"
