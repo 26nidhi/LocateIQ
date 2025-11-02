@@ -3,7 +3,7 @@ import React, { useState, useEffect, useContext } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { AuthContext } from "../contexts/AuthContext";
-import ChatPanel from "../components/ChatPanel";
+import ChatPanel from "./ChatPanel";
 
 export default function MatchDetails() {
   const { matchId } = useParams();
@@ -13,10 +13,8 @@ export default function MatchDetails() {
   const fetchMatch = async () => {
     try {
       const res = await axios.get(
-        `http://localhost:3000/api/matches/${matchId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        `http://localhost:5000/api/matches/${matchId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       setMatch(res.data.match);
     } catch (err) {
@@ -37,7 +35,6 @@ export default function MatchDetails() {
         <strong>{match.reportA.title}</strong> ↔{" "}
         <strong>{match.reportB.title}</strong>
       </p>
-
       <ChatPanel matchId={matchId} />
     </div>
   );
