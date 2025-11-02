@@ -4,27 +4,36 @@ import { io } from "socket.io-client";
 let socket;
 
 export const connectSocket = (token) => {
-  if (!token) return;
+  if (!token) {
+    console.warn("⚠️ No token found, socket not connected");
+    return;
+  }
 
-  // connect to backend socket server
-  socket = io("http://localhost:3000", {
+  socket = io("http://localhost:5000", {
     auth: { token },
+    transports: ["websocket", "polling"], // ✅ fallback
+    withCredentials: true,
+    reconnectionAttempts: 5,
   });
 
-  // ✅ when connected
   socket.on("connect", () => {
     console.log("✅ Connected to socket server:", socket.id);
   });
 
-  // ⚡ when disconnected
-  socket.on("disconnect", () => {
-    console.log("❌ Disconnected from socket server");
+  socket.on("connect_error", (err) => {
+    console.error("❌ Socket connection error:", err.message);
   });
 
-  // 🔔 Listen for match notification
-  socket.on("matchFound", (data) => {
-    console.log("🔔 New Match Found:", data);
-    alert(data.message || "New item match detected!");
+  socket.on("newMatch", (data) => {
+    console.log("🔔 New Match:", data);
+  });
+
+  socket.on("newMessage", (data) => {
+    console.log("💬 New message:", data);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("❌ Disconnected from socket server");
   });
 };
 

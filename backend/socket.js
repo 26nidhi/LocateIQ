@@ -1,35 +1,48 @@
+// server/socket.js
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import Match from "./models/Match.model.js";
 import Chat from "./models/Chat.model.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "secretkey";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 let io;
 
 export const initSocket = (server) => {
   io = new Server(server, {
-    cors: { origin: "*" },
+    cors: {
+      origin: "http://localhost:5173", // ✅ frontend port
+      methods: ["GET", "POST"],
+      credentials: true,
+    },
+    transports: ["websocket", "polling"], // ✅ support both
   });
 
-  // Authenticate socket
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token;
-    if (!token) return next(new Error("Authentication error"));
+    console.log("🟡 Incoming socket auth token:", token);
+
+    if (!token) {
+      console.log("❌ No token provided");
+      return next(new Error("Authentication error"));
+    }
+
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
+      console.log("✅ Token verified for user:", decoded);
       socket.userId = decoded.id;
       next();
     } catch (err) {
+      console.log("❌ Invalid token:", err.message);
       next(new Error("Authentication error"));
     }
   });
 
   io.on("connection", (socket) => {
-    console.log(`User connected: ${socket.userId}`);
-    socket.join(socket.userId); // join user-specific room
+    console.log(`🟢 User connected: ${socket.userId}`);
+    socket.join(socket.userId);
 
-    // ------------------ Handle Chat ------------------
+    // Message handler
     socket.on("sendMessage", async ({ matchId, text }) => {
       try {
         const chatMsg = await Chat.create({
@@ -38,7 +51,7 @@ export const initSocket = (server) => {
           text,
         });
 
-        const match = await Match.findById(matchId);
+        const match = await Match.findById(matchId).populate("reportA reportB");
         if (!match) return;
 
         const users = [
@@ -52,6 +65,7 @@ export const initSocket = (server) => {
             matchId,
             text: chatMsg.text,
             sender: socket.userId === userId ? "me" : "other",
+            createdAt: chatMsg.createdAt,
           });
         });
       } catch (err) {
@@ -60,17 +74,16 @@ export const initSocket = (server) => {
     });
 
     socket.on("disconnect", () => {
-      console.log(`User disconnected: ${socket.userId}`);
+      console.log(`🔴 User disconnected: ${socket.userId}`);
     });
   });
 
   return io;
 };
 
-// ------------------ Notify Match ------------------
+// Notify match updates
 export const notifyMatch = async (matchId) => {
   if (!io) return;
-
   const match = await Match.findById(matchId).populate("reportA reportB");
   if (!match) return;
 

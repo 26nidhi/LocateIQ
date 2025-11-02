@@ -30,12 +30,11 @@ const reportSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Match",
       default: null,
-    }, // <-- new
+    },
   },
   { timestamps: true }
 );
 
-// Create indexes for search
 reportSchema.index({
   title: "text",
   category: "text",

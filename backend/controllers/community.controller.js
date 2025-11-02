@@ -1,11 +1,10 @@
 // server/controllers/community.controller.js
 import Community from "../models/Community.model.js";
-import User from "../models/User.model.js";
 
 export const createCommunity = async (req, res, next) => {
   try {
     const { name, description } = req.body;
-    const owner = req.user.id; // from auth middleware
+    const owner = req.user.id;
 
     const existing = await Community.findOne({ name });
     if (existing)
@@ -18,7 +17,6 @@ export const createCommunity = async (req, res, next) => {
       members: [owner],
     });
     await community.save();
-
     res.status(201).json({ community });
   } catch (err) {
     next(err);
@@ -28,7 +26,7 @@ export const createCommunity = async (req, res, next) => {
 export const joinCommunity = async (req, res, next) => {
   try {
     const { communityId } = req.params;
-    const userId = req.user.id; // from auth middleware
+    const userId = req.user.id;
 
     const community = await Community.findById(communityId);
     if (!community)

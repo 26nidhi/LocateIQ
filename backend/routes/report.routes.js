@@ -1,3 +1,4 @@
+// server/routes/report.routes.js
 import express from "express";
 import {
   createReport,
@@ -5,10 +6,11 @@ import {
   getReportMatches,
 } from "../controllers/report.controller.js";
 import authMiddleware from "../middlewares/authMiddleware.js";
+import upload from "../middlewares/uploadMiddleware.js";
 
 const router = express.Router();
 
-router.post("/", authMiddleware, createReport);
+router.post("/", authMiddleware, upload.array("images"), createReport);
 router.get("/community/:communityId", authMiddleware, getReportsByCommunity);
 router.get("/:reportId/matches", authMiddleware, getReportMatches);
 

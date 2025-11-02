@@ -5,7 +5,7 @@ import {
   joinCommunity,
   listCommunities,
 } from "../controllers/community.controller.js";
-import authMiddleware from "../middlewares/authMiddleware.js"; // we’ll create this
+import authMiddleware from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 

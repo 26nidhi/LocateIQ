@@ -18,52 +18,65 @@ import chatRoutes from "./routes/chat.routes.js";
 
 import { initSocket } from "./socket.js";
 
-dotenv.config();
+
+dotenv.config({
+  path: "./.env",
+});
+console.log("✅ ENV CHECK -> JWT_SECRET:", process.env.JWT_SECRET);
 
 const app = express();
 
 // ------------------ Middleware ------------------
 app.use(express.json());
-app.use(cors());
+
+// ✅ CORS: Restrict only to frontend origin for both Express and Socket.IO
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
+
 app.use(helmet());
 app.use(morgan("dev"));
 
-// Rate limiter
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 100,
 });
 app.use(limiter);
 
-// DB
+// ------------------ Database ------------------
 connectDB();
 
-// Health
+// ------------------ Routes ------------------
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", message: "LocateIQ server is running!" });
 });
 
-// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/communities", communityRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/matches", matchRoutes);
 app.use("/api/chats", chatRoutes);
 
-// Error handler (last)
+// ------------------ Error Handler ------------------
 app.use(errorHandler);
 
 // ------------------ Server + Socket ------------------
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
+
+// ✅ Initialize socket with correct CORS
 const io = initSocket(server);
 
-// attach io to req so controllers can emit if needed
+// Attach io to req for event emits
 app.use((req, res, next) => {
   req.io = io;
   next();
 });
 
+// ------------------ Start Server ------------------
 server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
