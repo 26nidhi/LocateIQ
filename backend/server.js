@@ -1,9 +1,12 @@
+// server/server.js
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import morgan from "morgan";
+import http from "http";
+
 import connectDB from "./config/db.js";
 import errorHandler from "./middlewares/errorHandler.js";
 
@@ -28,38 +31,39 @@ app.use(morgan("dev"));
 // Rate limiter
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per window
+  max: 100,
 });
 app.use(limiter);
 
-// MongoDB connection
+// DB
 connectDB();
 
-// ------------------ Routes ------------------
+// Health
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", message: "LocateIQ server is running!" });
 });
 
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/communities", communityRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/matches", matchRoutes);
 app.use("/api/chats", chatRoutes);
 
-// Error handler middleware
+// Error handler (last)
 app.use(errorHandler);
 
-// ------------------ Start Server ------------------
+// ------------------ Server + Socket ------------------
 const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
-// ------------------ Socket.IO ------------------
+const server = http.createServer(app);
 const io = initSocket(server);
 
-// Optional: attach io to requests if you want to use req.io in controllers
+// attach io to req so controllers can emit if needed
 app.use((req, res, next) => {
   req.io = io;
   next();
+});
+
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
