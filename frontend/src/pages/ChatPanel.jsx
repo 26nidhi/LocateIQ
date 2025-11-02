@@ -1,15 +1,22 @@
 // client/src/components/ChatPanel.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { getSocket } from "../socket";
 import axios from "axios";
+import { AuthContext } from "../contexts/AuthContext";
 
 export default function ChatPanel({ matchId }) {
+  const { token } = useContext(AuthContext);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
 
   const fetchMessages = async () => {
     try {
-      const res = await axios.get(`http://localhost:3000/api/chats/${matchId}`);
+      const res = await axios.get(
+        `http://localhost:5000/api/chats/${matchId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       setMessages(res.data.messages);
     } catch (err) {
       console.error(err);
@@ -22,30 +29,22 @@ export default function ChatPanel({ matchId }) {
     if (!socket) return;
 
     const handleNewMessage = (msg) => {
-      if (msg.matchId === matchId) {
-        setMessages((prev) => [...prev, msg]);
-      }
+      if (msg.matchId === matchId) setMessages((prev) => [...prev, msg]);
     };
 
     socket.on("newMessage", handleNewMessage);
     return () => socket.off("newMessage", handleNewMessage);
-  }, [matchId]);
+  }, [matchId, token]);
 
-  const sendMessage = async () => {
+  const sendMessage = () => {
     if (!input.trim()) return;
     const socket = getSocket();
-    const msgData = { matchId, text: input };
-    try {
-      // Emit to socket server
-      socket.emit("sendMessage", msgData);
-      setMessages((prev) => [
-        ...prev,
-        { ...msgData, _id: Date.now(), sender: "me" },
-      ]);
-      setInput("");
-    } catch (err) {
-      console.error(err);
-    }
+    socket.emit("sendMessage", { matchId, text: input });
+    setMessages((prev) => [
+      ...prev,
+      { _id: Date.now(), matchId, text: input, sender: "me" },
+    ]);
+    setInput("");
   };
 
   return (
@@ -68,11 +67,11 @@ export default function ChatPanel({ matchId }) {
       <div className="flex space-x-2 mt-2">
         <input
           type="text"
-          className="flex-1 p-2 border rounded dark:bg-gray-700 dark:text-gray-100"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Type a message..."
           onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+          className="flex-1 p-2 border rounded dark:bg-gray-700 dark:text-gray-100"
+          placeholder="Type a message..."
         />
         <button
           onClick={sendMessage}
