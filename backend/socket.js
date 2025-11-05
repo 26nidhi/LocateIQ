@@ -6,43 +6,37 @@ import Chat from "./models/Chat.model.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-let io;
+let io = null;
 
 export const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: "http://localhost:5173", // ✅ frontend port
+      origin: process.env.FRONTEND_URL || "http://localhost:5173",
       methods: ["GET", "POST"],
       credentials: true,
     },
-    transports: ["websocket", "polling"], // ✅ support both
+    transports: ["websocket", "polling"],
   });
 
+  // simple token auth for socket handshake
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token;
-    console.log("🟡 Incoming socket auth token:", token);
-
-    if (!token) {
-      console.log("❌ No token provided");
-      return next(new Error("Authentication error"));
-    }
+    if (!token) return next(new Error("Authentication error"));
 
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
-      console.log("✅ Token verified for user:", decoded);
       socket.userId = decoded.id;
-      next();
+      return next();
     } catch (err) {
-      console.log("❌ Invalid token:", err.message);
-      next(new Error("Authentication error"));
+      return next(new Error("Authentication error"));
     }
   });
 
   io.on("connection", (socket) => {
-    console.log(`🟢 User connected: ${socket.userId}`);
-    socket.join(socket.userId);
+    // join personal room
+    console.log(`User connected: ${socket.userId}`);
+    if (socket.userId) socket.join(socket.userId);
 
-    // Message handler
     socket.on("sendMessage", async ({ matchId, text }) => {
       try {
         const chatMsg = await Chat.create({
@@ -74,30 +68,44 @@ export const initSocket = (server) => {
     });
 
     socket.on("disconnect", () => {
-      console.log(`🔴 User disconnected: ${socket.userId}`);
+      // nothing special
     });
   });
 
   return io;
 };
 
-// Notify match updates
+// Helper: emit event to a single user (if connected)
+export const emitToUser = (userId, event, payload) => {
+  if (!io) return;
+  try {
+    io.to(String(userId)).emit(event, payload);
+  } catch (err) {
+    console.error("emitToUser error:", err.message);
+  }
+};
+
+// Notify match (keeps previous behavior, but simpler)
 export const notifyMatch = async (matchId) => {
   if (!io) return;
-  const match = await Match.findById(matchId).populate("reportA reportB");
-  if (!match) return;
+  try {
+    const match = await Match.findById(matchId).populate("reportA reportB");
+    if (!match) return;
 
-  const users = [
-    match.reportA.reporterId.toString(),
-    match.reportB.reporterId.toString(),
-  ];
+    const users = [
+      match.reportA.reporterId.toString(),
+      match.reportB.reporterId.toString(),
+    ];
 
-  users.forEach((userId) => {
-    io.to(userId).emit("newMatch", {
-      matchId: match._id,
-      reportA: match.reportA,
-      reportB: match.reportB,
-      score: match.score,
+    users.forEach((userId) => {
+      io.to(userId).emit("newMatch", {
+        matchId: match._id,
+        reportA: match.reportA,
+        reportB: match.reportB,
+        score: match.score,
+      });
     });
-  });
+  } catch (err) {
+    console.error("notifyMatch error:", err.message);
+  }
 };
