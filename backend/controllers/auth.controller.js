@@ -1,36 +1,118 @@
+// server/controllers/auth.controller.js
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import User from "../models/User.model.js";
 import Community from "../models/Community.model.js";
+import Invite from "../models/Invite.model.js";
 import { sendEmail } from "../utils/sendEmail.js";
+import {
+  createNotification,
+  createActivity,
+} from "../services/notificationService.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = "7d";
 
-// Helper to generate JWT
+// Helper: generate JWT
 const generateToken = (user) =>
   jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN,
   });
 
-/* ===============================
-   Normal user registration (will later use invite)
-   =============================== */
+/* ==========================================
+   Normal user registration (with optional invite)
+   ========================================== */
 export const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
+    const { invite: inviteToken } = req.query;
 
     const existingUser = await User.findOne({ email });
     if (existingUser)
       return res.status(400).json({ message: "Email already registered" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ name, email, password: hashedPassword });
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role: "user",
+    });
+
+    // If invite token provided, process it
+    if (inviteToken) {
+      const invite = await Invite.findOne({ token: inviteToken });
+      if (!invite)
+        return res.status(400).json({ message: "Invalid invite token" });
+      if (invite.used)
+        return res.status(400).json({ message: "Invite already used" });
+      if (invite.expiresAt < new Date())
+        return res.status(400).json({ message: "Invite expired" });
+      if (invite.email !== email)
+        return res
+          .status(400)
+          .json({ message: "Email must match invited email" });
+
+      // Add user to community
+      const community = await Community.findById(invite.communityId);
+      if (community) {
+        community.members.push(user._id);
+        await community.save();
+
+        user.communities.push(community._id);
+        await user.save();
+      }
+
+      invite.used = true;
+      await invite.save();
+
+      // Log activity
+      await createActivity(user._id, "invite.accept", "Invite", invite._id, {
+        communityId: community?._id,
+      });
+
+      // Notify community owner (in-app + email)
+      const ownerId = community?.owner;
+      if (ownerId) {
+        const title = "New Member Joined";
+        const message = `${user.name} joined your community ${community.name}`;
+        await createNotification(
+          ownerId,
+          title,
+          message,
+          {
+            userId: user._id,
+            communityId: community._id,
+            email: community.owner.email,
+          },
+          "in_app"
+        );
+        await createNotification(
+          ownerId,
+          title,
+          message,
+          {
+            userId: user._id,
+            communityId: community._id,
+            email: community.owner.email,
+          },
+          "email"
+        );
+      }
+    }
 
     const token = generateToken(user);
-
     res.status(201).json({
-      user: { id: user._id, name: user.name, email: user.email },
+      message: inviteToken
+        ? "Signup successful and joined community"
+        : "Signup successful",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        communities: user.communities,
+      },
       token,
     });
   } catch (err) {
@@ -39,9 +121,9 @@ export const register = async (req, res) => {
   }
 };
 
-/* ===============================
+/* ==========================================
    Community Owner Registration
-   =============================== */
+   ========================================== */
 export const registerOwner = async (req, res) => {
   try {
     const { name, email, password, communityName, description, location } =
@@ -70,20 +152,38 @@ export const registerOwner = async (req, res) => {
       status: "pending",
     });
 
-    // Link community to owner
     owner.communities.push(community._id);
     await owner.save();
 
-    // Notify admin via email
+    // Notify admin
     const adminEmail = process.env.ADMIN_EMAIL;
     const mailHTML = `
       <h3>New Community Approval Request</h3>
       <p><b>Community:</b> ${communityName}</p>
       <p><b>Owner:</b> ${name} (${email})</p>
       <p><b>Description:</b> ${description || "N/A"}</p>
-      <p>Please log in to the admin dashboard to approve or reject this request.</p>
     `;
     await sendEmail(adminEmail, "New Community Approval Request", mailHTML);
+
+    // Activity log
+    await createActivity(
+      owner._id,
+      "community.request",
+      "Community",
+      community._id,
+      {
+        communityName,
+      }
+    );
+
+    // Notify owner confirmation
+    await createNotification(
+      owner._id,
+      "Community Request Submitted",
+      `Your community "${community.name}" request has been sent for admin approval.`,
+      { communityId: community._id },
+      "in_app"
+    );
 
     res.status(201).json({
       message: "Signup successful. Waiting for admin approval.",
@@ -96,14 +196,17 @@ export const registerOwner = async (req, res) => {
   }
 };
 
-/* ===============================
+/* ==========================================
    Login User
-   =============================== */
+   ========================================== */
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const user = await User.findOne({ email }).populate(
+      "communities",
+      "name status"
+    );
 
-    const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
     const isMatch = await user.comparePassword(password);
@@ -112,6 +215,7 @@ export const login = async (req, res) => {
 
     const token = generateToken(user);
     res.json({
+      message: "Login successful",
       user: {
         id: user._id,
         name: user.name,
@@ -127,9 +231,9 @@ export const login = async (req, res) => {
   }
 };
 
-/* ===============================
+/* ==========================================
    Get Current User
-   =============================== */
+   ========================================== */
 export const me = async (req, res) => {
   try {
     const user = await User.findById(req.user.id)
