@@ -9,6 +9,11 @@ import dotenv from "dotenv";
 import errorHandler from "./middlewares/errorHandler.js";
 
 import authRoutes from "./routes/auth.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
+import inviteRoutes from "./routes/invite.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
+import activityRoutes from "./routes/activity.routes.js";
+import analyticsRoutes from "./routes/analytics.routes.js";
 // Later we’ll add communityRoutes, reportRoutes, etc.
 
 dotenv.config();
@@ -44,10 +49,15 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", message: "Backend is running!" });
 });
 
-// Register routes
+//routes
 app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/invite", inviteRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/activities", activityRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
-// Error handler (centralized)
+// Error handler
 app.use(errorHandler);
 
 export default app;
